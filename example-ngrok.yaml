@@ -1,0 +1,14 @@
+# on macOS, place at ~/.ngrok2/ngrok.yml
+
+authtoken: <authtoken>
+tunnels:
+  rtmp:
+    proto: tcp
+    addr: 1935
+  hls:
+    proto: http
+    addr: 3737
+  http:
+    proto: http
+    addr: 3737
+    subdomain: daily-cable-access

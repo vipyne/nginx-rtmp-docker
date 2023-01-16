@@ -43,6 +43,8 @@ RUN cd /tmp/build/nginx/${NGINX_VERSION} && \
     make -j $(getconf _NPROCESSORS_ONLN) && \
     make install && \
     mkdir /var/lock/nginx && \
+    mkdir /etc/stat && \
+    cp /tmp/build/nginx-rtmp-module/nginx-rtmp-module-${NGINX_RTMP_MODULE_VERSION}/stat.xsl /etc/stat/stat.xsl && \
     rm -rf /tmp/build
 
 # Forward logs to Docker
@@ -51,6 +53,9 @@ RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
 
 # Set up config file
 COPY nginx.conf /etc/nginx/nginx.conf
+
+RUN mkdir src
+COPY src/ src/
 
 EXPOSE 1935
 CMD ["nginx", "-g", "daemon off;"]

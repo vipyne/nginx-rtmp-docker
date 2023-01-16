@@ -1,0 +1,114 @@
+<head></head>
+<body style="background-color:black;">
+  <h1 id="status" style="background-color:grey;">/daily cable access</h1>
+  <h2 id="now-playing" style="background-color:teal;"></h2>
+  <video
+    id="tv"
+    width="800px"
+    height="400px"
+    src="daily-noise.mp4"
+    type="video/mp4"
+  >
+  </video>
+</body>
+
+<script type="text/javascript">
+  const noiseVideo = "daily-noise.mp4";
+
+  const statURL = `https://${window.location.hostname}/stat`;
+
+  const h2Status = document.getElementById(`now-playing`);
+  const tv = document.getElementById(`tv`);
+  tv.setAttribute('loop', true);
+  tv.addEventListener('click', () => {
+    try {
+      tv.play();
+    } catch (e) {
+      console.log("_____could not play");
+    }
+  })
+  tv.addEventListener('error', (eve) => {
+    console.log("_____video player error:", eve);
+  });
+
+  let somethingIsStreaming = false;
+  let weShouldStream = false;
+  let streamName;
+
+  let interval = setInterval(async () => {
+    fetch(statURL)
+      .then((resp) => {
+        return resp.body;
+      })
+      .then((rb) => {
+        const reader = rb.getReader();
+
+        return new ReadableStream({
+          start(controller) {
+            function push() {
+              reader.read().then(({ done, value }) => {
+                if (done) {
+                  controller.close();
+                  return;
+                } else {
+                  // parse rtmp stats XML
+                  let string = new TextDecoder().decode(value);
+                  string = string.replace('\"','"')
+                  const parser = new DOMParser();
+                  const doc = parser.parseFromString(string, "application/xml");
+                  const live = doc.getElementsByTagName('live');
+                  if (live.length && live[0]) {
+                    const streamHTLMnodes = live[0].children;
+                    const streamNameNode = streamHTLMnodes[0].getElementsByTagName('name');
+                    if ("0" === streamHTLMnodes[0].innerHTML) {
+                      weShouldStream = false;
+                    } else if (streamHTLMnodes.length > 1) {
+                      weShouldStream = true;
+                      streamName = streamNameNode[0].innerHTML;
+                    }
+                  } else {
+                    console.log("_____hmmm... ", live)
+                    weShouldStream = false;
+                  }
+                }
+                controller.enqueue(value);
+                push();
+              });
+            }
+            push();
+          },
+        });
+      })
+      .catch((e) => {
+        console.log(`___err`, e);
+      });
+
+    // console.log("_____somethingIsStreaming ", somethingIsStreaming)
+    // console.log("___________weShouldStream ", weShouldStream)
+
+    // timeout times empirically derived
+    if (!somethingIsStreaming && weShouldStream) {
+      somethingIsStreaming = true;
+      h2Status.innerHTML = `up next: ${streamName}`;
+      setTimeout(() => {
+        tv.setAttribute('src', `${streamName}.m3u8`);
+        tv.setAttribute('type', 'application/x-mpegURL');
+        tv.click();
+        setTimeout(() => {
+          h2Status.innerHTML = `now playing: ${streamName}`;
+        },7 * 1000);
+      }, 10 * 1000);
+    } else {
+      if (somethingIsStreaming && !weShouldStream) {
+        somethingIsStreaming = false;
+        h2Status.innerHTML = `${streamName} will end soon...`;
+        setTimeout(() => {
+          h2Status.innerHTML = ``;
+          tv.setAttribute('src', noiseVideo);
+          tv.setAttribute('type', 'video/mp4');
+          tv.click();
+        }, 30 * 1000);
+      }
+    }
+  }, 3 * 1000);
+</script>
